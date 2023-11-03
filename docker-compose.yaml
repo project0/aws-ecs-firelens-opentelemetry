@@ -1,0 +1,37 @@
+# kinda mock up the firelens setup
+services:
+  otel:
+    image: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.88.0
+    restart: always
+    command: ["--config", "/etc/otel-collector.yaml"]
+    configs:
+        - source: otel
+          target: /etc/otel-collector.yaml
+
+    volumes:
+      - type: volume
+        source: fluent
+        target: /fluent-vol
+        read_only: false
+
+  fluentd:
+#   fluent.conf /fluentd/etc/
+    image: cr.fluentbit.io/fluent/fluent-bit
+    command: ["-c", "/fluentd/etc/fluent.conf"]
+    restart: always
+    configs:
+        - source: fluent
+          target: /fluentd/etc/fluent.conf
+    ports:
+      - 5170:5170
+#    volumes:
+#      - fluent:/fluent-vol
+#
+
+configs:
+  otel:
+    file: ./config/otel-collector.yaml
+
+  fluent:
+    file: ./config/fluend-bit.yaml
+

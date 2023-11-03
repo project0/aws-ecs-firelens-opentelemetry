@@ -1,0 +1,38 @@
+[SERVICE]
+    Flush      5
+    Daemon     off
+    Log_Level  info
+
+# echo 'content' | nc -c localhost 5170
+[INPUT]
+    # ECS sets this tag
+    tag         otel-example-service-firelens-747cf02db3084d0d9e98610b38046b9c
+    Name        tcp
+    Listen      0.0.0.0
+    Port        5170
+    Chunk_Size  32
+    Buffer_Size 64
+    Format      none
+
+[FILTER]
+    Name modify
+    Match *
+    # AWS is setting the following fields:
+    Add container_id 747cf02db3084d0d9e98610b38046b9c-1856078953
+    Add container_name otel-example-service
+    Add source stdout
+
+[OUTPUT]
+    Name          forward
+    Match         *
+    Host          otel
+    Port          24284
+
+# i had some permission problems  in docker, so using tcp instead
+# [OUTPUT]
+#    Name          forward
+#    Unix_Path      /var/run/fluent.sock
+
+[OUTPUT]
+    Name  stdout
+    Match *

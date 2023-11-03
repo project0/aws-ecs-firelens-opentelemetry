@@ -1,0 +1,82 @@
+exporters:
+  debug:
+    verbosity: basic
+  # send logs additional to stdout
+  file:
+    path: /dev/stdout
+  otlp/honeycomb:
+    # update whatever you wan to send your data to
+    endpoint: api.honeycomb.io:443
+    headers:
+      x-honeycomb-team: <YOUR TEAM ID>
+extensions:
+  health_check: {}
+  pprof: {}
+  zpages: {}
+processors:
+  batch: {}
+  transform/firelens:
+    log_statements:
+      - context: log
+        statements:
+          # parse json logs
+          - merge_maps(cache, ParseJSON(body), "insert") where IsMatch(body, "^\\{")
+          # set message
+          - set(body, cache["message"]) where cache["message"] != nil
+
+          # set trace/span id
+          - set(trace_id.string, cache["trace_id"]) where cache["trace_id"] != nil
+          - set(span_id.string, cache["span_id"]) where cache["span_id"] != nil
+
+          # set severity when available
+          - set(severity_number, SEVERITY_NUMBER_INFO) where IsMatch(cache["level"], "(?i)info")
+          - set(severity_number, SEVERITY_NUMBER_WARN) where IsMatch(cache["level"], "(?i)warn")
+          - set(severity_number, SEVERITY_NUMBER_ERROR) where IsMatch(cache["level"], "(?i)err")
+          - set(severity_number, SEVERITY_NUMBER_DEBUG) where IsMatch(cache["level"], "(?i)debug")
+          - set(severity_number, SEVERITY_NUMBER_TRACE) where IsMatch(cache["level"], "(?i)trace")
+          - set(severity_number, cache["severity_number"])  where cache["severity_number"] != nil
+
+          - delete_matching_keys(cache, "^(message|trace_id|span_id|severity_number)$")
+
+          - merge_maps(attributes,cache, "insert")
+receivers:
+  fluentforward/socket:
+    # ECS will send logs to this socket
+    endpoint: unix:///var/run/fluent.sock
+  fluentforward/tcp:
+    # ECS will send logs to this socket
+    endpoint: 0.0.0.0:24284
+  otlp:
+    protocols:
+      grpc: {}
+      http: {}
+service:
+  extensions:
+    - health_check
+    - pprof
+    - zpages
+  pipelines:
+    logs:
+      exporters:
+        - file
+        - otlp/honeycomb
+      processors:
+        - transform/firelens
+      receivers:
+        - fluentforward/socket
+        - fluentforward/tcp
+        - otlp
+    metrics:
+      exporters:
+        - debug
+      processors:
+        - batch
+      receivers:
+        - otlp
+    traces:
+      exporters:
+        - debug
+      processors:
+        - batch
+      receivers:
+        - otlp

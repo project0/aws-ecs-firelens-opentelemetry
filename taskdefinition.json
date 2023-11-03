@@ -1,0 +1,85 @@
+{
+  "containerDefinitions": [
+      {
+          "name": "app",
+          "image": "ghcr.io/stefanprodan/podinfo:latest",
+          "command": [
+              "./podinfo",
+              "--port=9898",
+              "--level=info",
+              "--otel-service-name=otel-example-service"
+          ],
+          "portMappings": [
+              {
+                  "containerPort": 9898,
+                  "hostPort": 9898,
+                  "protocol": "tcp"
+              }
+          ],
+          "essential": true,
+          "environment": [
+              {
+                  "name": "OTEL_EXPORTER_OTLP_ENDPOINT",
+                  "value": "localhost:4317"
+              }
+          ],
+          "logConfiguration": {
+              "logDriver": "awsfirelens",
+              "options": {
+                  "Name": "opentelemetry"
+              }
+          }
+      },
+      {
+          "name": "otel",
+          "image": "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib:0.88.0",
+          "cpu": 0,
+          "portMappings": [],
+          "essential": true,
+          "command": [
+              "--config",
+              "/etc/otelcol-contrib/config.yaml"
+          ],
+          "environment": [],
+          "mountPoints": [
+              {
+                  "sourceVolume": "config",
+                  "containerPath": "/etc/otelcol-contrib"
+              }
+          ],
+          "volumesFrom": [],
+          "dependsOn": [
+              {
+                  "containerName": "config",
+                  "condition": "SUCCESS"
+              }
+          ],
+          "user": "0",
+          "logConfiguration": {
+              "logDriver": "awslogs",
+              "options": {
+                  "awslogs-group": "/ecs/otel-example-service",
+                  "awslogs-region": "eu-central-1",
+                  "awslogs-stream-prefix": "firelens",
+                  "awslogs-create-group": "true"
+              }
+          },
+          "firelensConfiguration": {
+              "type": "fluentbit"
+          }
+      }
+  ],
+  "networkMode": "awsvpc",
+  "volumes": [
+      {
+          "name": "config",
+          "host": {}
+      }
+  ],
+  "cpu": "256",
+  "memory": "1024",
+  "runtimePlatform": {
+      "cpuArchitecture": "X86_64",
+      "operatingSystemFamily": "LINUX"
+  }
+}
